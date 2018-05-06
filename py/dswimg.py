@@ -18,6 +18,29 @@ import math
 from PIL import Image
 
 
+def BiasedGamma(img, gam, bias, maxval=None):
+	if not maxval:
+		maxval = SoftMax(img)
+	t = ( ((img+bias)/(maxval+bias)).clip(0,None) )**(1/gam)
+	t0 = (bias/(bias+maxval))**(1/gam)
+	tmax = 1.0
+	a = maxval / (tmax-t0)
+	return a*(t-t0)
+
+
+
+def SoftMax(A):
+	"""
+		Calculate a mushy rough maximum, ignoring single or few pixels,
+		but weighted by the more numerous of the brighter pixels
+		Useful for setting levels based on generic sky, white objects, etc
+		but not stars, cosmic rays, tiny specular hotspots, sun glints
+	"""
+	s = A[::8,::8]
+	w = (s-s.mean()).clip(0,None)**3
+	return (s*w).mean() / w.mean() 
+
+
 def calcstats(img, subsample=7):
 	xmin = img.min()
 	xmax = img.max()
@@ -290,3 +313,71 @@ def HalfSize(im):
 	w=(w//2)*2
 	s= im[0:h:2,0:w:2] + im[1:h:2,0:w:2] + im[1:h:2,1:w:2] + im[0:h:2,1:w:2]
 	return s/4.0
+
+
+
+def StandardRGB_to_XYZ(sR,sG,sB):
+	"""
+		Convert sRGB to CIE XYZ
+		Assumes R,G,B are byte values, 0 to 255
+	"""
+	def linearize(r):
+		rhot = r > 0.04045
+		r1 = r/12.92
+		r2 = ( (r+0.055)/1.055 )**2.4
+		return  rhot*r2 + (1-rhot)*r1
+		
+	r = linearize( (sR/255).clip(0,255) )
+	g = linearize( (sG/255).clip(0,255) )
+	b = linearize( (sB/255).clip(0,255) )
+	r*=100.0
+	g*=100.0
+	b*=100.0
+	X = 0.4124*r + 0.3576*g + 0.1805*b
+	Y = 0.2126*r + 0.7152*g + 0.0722*b
+	Z = 0.0193*r + 0.1192*g + 0.9505*b
+	return X,Y,Z
+
+
+
+def XYZ_to_LAB(X,Y,Z, ref=[100,94,108]):
+	"""
+		Convert CIE XYZ to LAB
+	"""
+	def curve(x):
+		xhot = x > 0.008856
+		x1 = 7.787*x + 16.0/116.0
+		x2 = x ** (1./3.)
+		return xhot*x2 + (1-xhot)*x1
+		
+	xn = curve(X/ref[0])
+	yn = curve(Y/ref[1])
+	zn = curve(Z/ref[2])
+	return  116.0*yn - 16.0,  500*(xn-yn),  200*(yn-zn)
+
+
+def LAB_to_XYZ(L,A,B, ref=[100,94,108]):
+	def fixc(t):
+		thot = t > (0.008856**(1./3.))
+		t1 = (t-16.0/116.0) / 7.787
+		t2 = t**3
+		return thot*t2 + (1-thot)*t1
+	
+	ty = (L + 16)/116.0
+	tx = A / 500.0 + ty
+	tz = ty - B / 200.0
+	return  ref[0]*fixc(tx), ref[1]*fixc(ty), ref[2]*fixc(tz)
+
+def XYZ_to_StandardRGB(X,Y,Z):
+	def nonlin(v):
+		v = (v/100.0).clip(0,1.0)
+		vhot = v > 0.0031308
+		a1 = 12.92*v
+		a2 = 1.055*(v**(1/2.4)) - 0.055
+		return vhot*a2 + (1-vhot)*a1
+	
+	vr =   3.2406*X - 1.5372*Y - 0.4986*Z
+	vg =  -0.9689*X + 1.8758*Y + 0.0415*Z
+	vb =   0.0557*X - 0.2040*Y + 1.0570*Z
+	return 255*nonlin(vr), 255*nonlin(vg), 255*nonlin(vb)
+	
