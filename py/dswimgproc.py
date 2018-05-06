@@ -375,14 +375,47 @@ def Scatter2D(	img, Nrepeat=1, seed=9009):
 	np.random.seed(seed)
 	for n in range(Nrepeat):
 		for i in range(W*H//2):
-			# Do an adjacent horizontal swap
+			# Swap adjacent horizontal pixels
 			x = np.random.randint(1,W)
 			y = np.random.randint(0,H)
 			B[y,x-1], B[y,x] = B[y,x], B[y,x-1] 
-			# Do an adjacent vertical swap
+			# Swap adjacent vertical pixels
 			x = np.random.randint(0,W)
 			y = np.random.randint(1,H)
 			B[y,x], B[y-1,x] = B[y-1,x], B[y,x] 
 	return B
 
+
+def ScatterBlock(img, Nacross, Nalong, Nrepeat=1, seed=9009):
+	"""
+		Swapping adjacent blocks of pixels, similar to Scatter2D().
+		ARGS
+			img:  2D array holding image
+			Nacross: size of block in pixels, perp to direction of motion
+			Nalong:  size of block along direction of motion.,
+			      note direction of motion is only ±X or ±Y.
+			Nrepeat: repeat the operation for more scattering. 
+			       Default 1.  
+	"""
+	B = img.copy()
+	H,W = B.shape
+	mm = 0.95*B.max()
+	np.random.seed(seed)
+	for n in range(Nrepeat):
+		for i in range(W*H//(4*Nacross*Nalong)):
+			# Do a horizontal swap
+			x = np.random.randint(0, W-(Nalong*2-1))
+			y = np.random.randint(0, H-(Nacross-1))
+			snip1 = B[y:y+Nacross, x:x+Nalong].copy()
+			snip2 = B[y:y+Nacross, x+Nalong:x+2*Nalong].copy()
+			B[y:y+Nacross, x:x+Nalong]  = snip2
+			B[y:y+Nacross, x+Nalong:x+2*Nalong] = snip1
+			# Do a vertical swap
+			x = np.random.randint(0, W-(Nacross-1))
+			y = np.random.randint(0, H-(Nalong*2-1))
+			snip1 = B[y:y+Nalong, x:x+Nacross].copy() 
+			snip2 = B[y+Nalong:y+2*Nalong, x:x+Nacross].copy()
+			B[y:y+Nalong, x:x+Nacross] = snip2
+			B[y+Nalong:y+2*Nalong, x:x+Nacross]  = snip1
+	return B
 
