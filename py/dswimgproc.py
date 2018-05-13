@@ -12,7 +12,7 @@
 """
 
 
-from numpy import *
+import numpy as np
 import scipy.ndimage as spim
 import math
 
@@ -46,26 +46,26 @@ def ppnoise(im):
 	ddy=ay-0.5*(ayy+a)
 	
 	# first cut of bad data, typically hard edges, cosmic rays. 
-	lim=25*min( std(ddx), std(ddy))
-	good = ((abs(ddx)+abs(ddy)) <lim).astype('f')
-	if sum(good) < 10:
+	lim=25*min( np.std(ddx), np.std(ddy))
+	good = ((np.abs(ddx)+np.abs(ddy)) < lim).astype('f')
+	if np.sum(good) < 10:
 		return math.nan
 	
 	# subtract bias due to large-scale curvature
-	ddx = ddx - sum(ddx*good)/sum(good)
-	ddx = ddx - sum(ddx*good)/sum(good)
+	ddx = ddx - np.sum(ddx*good) / np.sum(good)
+	ddx = ddx - np.sum(ddx*good) / np.sum(good)
 	
 	# compute std dev, weighted by goodness, assuming zero mean
-	stddevx = math.sqrt( sum(good*(ddx**2))/sum(good))
-	stddevy = math.sqrt( sum(good*(ddy**2))/sum(good))
+	stddevx = math.sqrt( np.sum(good*(ddx**2)) / np.sum(good))
+	stddevy = math.sqrt( np.sum(good*(ddy**2)) / np.sum(good))
 	
 	# Repeat, imposing tighter limit on defining "good" data
 	lim=6*(stddevx+stddevy)/2.
-	good = ((abs(ddx)+abs(ddy)) <lim).astype('f')
-	ddx = ddx - sum(ddx*good)/sum(good)
-	ddx = ddx - sum(ddx*good)/sum(good)
-	stddevx = math.sqrt( sum(good*(ddx**2))/sum(good))
-	stddevy = math.sqrt( sum(good*(ddy**2))/sum(good))
+	good = ((np.abs(ddx)+np.abs(ddy)) < lim).astype('f')
+	ddx = ddx - np.sum(ddx*good) / np.sum(good)
+	ddx = ddx - np.sum(ddx*good) / np.sum(good)
+	stddevx = math.sqrt( np.sum(good*(ddx**2)) / np.sum(good))
+	stddevy = math.sqrt( np.sum(good*(ddy**2)) / np.sum(good))
 	rms = math.sqrt(stddevx**2+stddevy**2)
 	return (rms,  (stddevx, stddevy),  0)
 
@@ -76,7 +76,7 @@ def smooth3x3(im):
 	3x3 box average. Edges are handled.
 	"""
 	
-	zz=empty_like(im)
+	zz=np.empty_like(im)
 	zz[1:-1, :]= (im[0:-2, :] + im[1:-1,:] + im[2:,:])/3
 	zz[0,:]= (1.5*im[0,:]+im[1,:]+.5*im[2,:])/3
 	zz[-1,:]= (1.5*im[-1,:]+im[-2,:]+.5*im[-3,:])/3
@@ -125,7 +125,7 @@ def SimpleEdgeDetector321(im, fuzziness=1.0):
 	ee = abs(gradsmoothx(im)) + abs(gradsmoothy(im)) 
 	maxish = smooth3x3(ee).max()
 	pp = ppnoise(ee)
-	nn = np.sqrt(1.5*(pp[0]+pp[1]))
+	nn = np.sqrt(1.5*(pp[0]))
 	thresh = np.sqrt(nn*maxish)
 	t = np.tanh((ee-thresh)/(nn/fuzziness))
 	return t.clip(0,.75)/0.75
@@ -139,14 +139,14 @@ def gradsmoothx(im):
 	short-range smoothing to reduce sensitivity to noise.
 	Values are central difference.  Care is taken
 	to return meaningful values along edges, at corners
-
+	
 	INPUT
 		im: grayscale image as a 2D numpy array, or 3D for color.
 		     If color, must be shaped as [H,W,3]
 	RETURN
 		y-gradient of image in same-size array
 	"""
-	zz=empty_like(im)
+	zz=np.empty_like(im)
 	if len(im.shape)==3:
 		zz[:,:,0]=gradsmoothx(im[:,:,0])
 		zz[:,:,1]=gradsmoothx(im[:,:,1])
@@ -213,20 +213,20 @@ def gradsmoothy(im):
 	a short-range smoothing to reduce sensitivity to noise.
 	Values are central difference.  Care is taken
 	to return meaningful values along edges, at corners
-
+	
 	INPUT
 	   im: image as a 2D numpy array
 	RETURN
 	   same-size array with d/dy values
 	"""
-
-	zz=empty_like(im)
+	
+	zz=np.empty_like(im)
 	if len(im.shape)==3:
 	  zz[:,:,0]=gradsmoothy(im[:,:,0])
 	  zz[:,:,1]=gradsmoothy(im[:,:,1])
 	  zz[:,:,2]=gradsmoothy(im[:,:,2])
 	  return zz
-
+	
 	# main inside area of image
 	# pattern is weighted average   (1,2,1),1
 	zz[2:-2, 1:-1]=(    im[ 4:  , 1:-1] 
@@ -273,7 +273,7 @@ def gradsmoothy(im):
 	zz[-2, 0] = (2*im[-1, 0]+im[-1, 1] - 2*im[-3,0]-im[-3,1])/6.
 	zz[1, -1] = (2*im[2, -1]+im[2, -2] - 2*im[0, -1]-im[0, -2])/6.
 	zz[-2, -1] = (2*im[-1,-1]+im[-1,-2] - 2*im[-3,-1]-im[-3,-2])/6.
-
+	
 	zz[0,0]  = (zz[1,0]+zz[0,1])/2
 	zz[-1,0] = (zz[-2,0]+zz[-1,1])/2
 	zz[0,-1] = (zz[1,-1]+zz[0,-2])/2
@@ -370,7 +370,7 @@ def Scatter2D(	img, Nrepeat=1, seed=9009):
 			       The bigger this is, the slower it runs.
 		
 	"""
-	B = A.copy()
+	B = img.copy()
 	H,W = B.shape
 	np.random.seed(seed)
 	for n in range(Nrepeat):
